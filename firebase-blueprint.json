@@ -1,0 +1,71 @@
+{
+  "entities": {
+    "room": {
+      "title": "Room",
+      "description": "Watch party room",
+      "type": "object",
+      "properties": {
+        "movieId": { "type": "string" },
+        "hostId": { "type": "string" },
+        "status": { "type": "string" },
+        "currentPlaybackTime": { "type": "number" },
+        "isPlaying": { "type": "boolean" },
+        "createdAt": { "type": "timestamp" },
+        "updatedAt": { "type": "timestamp" }
+      },
+      "required": ["movieId", "hostId", "status"]
+    },
+    "member": {
+      "title": "Member",
+      "description": "Room member",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "joinedAt": { "type": "timestamp" }
+      },
+      "required": ["userId"]
+    },
+    "message": {
+      "title": "Message",
+      "description": "Chat message",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "text": { "type": "string" },
+        "createdAt": { "type": "timestamp" }
+      },
+      "required": ["userId", "text", "createdAt"]
+    },
+    "watchlistItem": {
+      "title": "WatchlistItem",
+      "description": "Movie in user watchlist",
+      "type": "object",
+      "properties": {
+        "movieId": { "type": "string" },
+        "title": { "type": "string" },
+        "coverUrl": { "type": "string" },
+        "addedAt": { "type": "timestamp" }
+      },
+      "required": ["movieId", "title"]
+    }
+  },
+  "firestore": {
+    "/rooms/{roomId}": {
+      "schema": "room",
+      "description": "Watch party rooms"
+    },
+    "/rooms/{roomId}/members/{memberId}": {
+      "schema": "member",
+      "description": "Members of a room"
+    },
+    "/rooms/{roomId}/messages/{messageId}": {
+      "schema": "message",
+      "description": "Messages in a room"
+    },
+    "/users/{userId}/watchlist/{movieId}": {
+      "schema": "watchlistItem",
+      "description": "User watchlist"
+    }
+  }
+}

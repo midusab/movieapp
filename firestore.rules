@@ -1,0 +1,84 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // --- Helpers ---
+    function isSignedIn() { return request.auth != null; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    
+    // Validation Helpers
+    function isValidRoom(data) {
+      return data.movieId is string && data.movieId.size() <= 128
+          && data.hostId is string && data.hostId.size() <= 128
+          && data.status is string && data.status.size() <= 20
+          && data.currentPlaybackTime is number
+          && data.isPlaying is bool;
+    }
+
+    function isValidMember(data) {
+      return data.userId is string && data.userId.size() <= 128;
+    }
+    
+    function isValidMessage(data) {
+      return data.userId is string && data.userId.size() <= 128
+          && data.senderName is string && data.senderName.size() <= 100
+          && data.text is string && data.text.size() <= 1000
+          && data.createdAt is timestamp;
+    }
+
+    function isValidWatchlist(data) {
+      return data.movieId is string && data.movieId.size() <= 128;
+    }
+
+    // --- Rules ---
+
+    // Default Deny
+    match /{document=**} { allow read, write: if false; }
+
+    match /rooms/{roomId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(roomId) && isValidRoom(incoming()) && incoming().hostId == request.auth.uid;
+      allow update: if isSignedIn() && isValidRoom(incoming()) 
+                     && incoming().hostId == existing().hostId // Immutable hostId
+                     && (
+                        (incoming().diff(existing()).affectedKeys().hasOnly(['currentPlaybackTime', 'isPlaying', 'updatedAt']))
+                        || (incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])) // For host to close room
+                     );
+    }
+
+    match /rooms/{roomId}/members/{memberId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(roomId) && isValidId(memberId) && isValidMember(incoming()) && incoming().userId == request.auth.uid;
+    }
+
+    match /rooms/{roomId}/messages/{messageId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(roomId) && isValidId(messageId) && isValidMessage(incoming()) && incoming().userId == request.auth.uid
+                     // Check membership here for Master Gate pattern
+                     && exists(/databases/$(database)/documents/rooms/$(roomId)/members/$(request.auth.uid));
+    }
+    
+    match /users/{userId} {
+      allow read, write: if isSignedIn() && userId == request.auth.uid;
+    }
+
+    match /users/{userId}/watchlist/{movieId} {
+      allow read: if isSignedIn() && userId == request.auth.uid;
+      allow create: if isSignedIn() && userId == request.auth.uid && isValidId(movieId) && isValidWatchlist(incoming());
+      allow delete: if isSignedIn() && userId == request.auth.uid;
+    }
+
+    match /movies/{movieId}/reviews/{reviewId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(movieId) && isValidId(reviewId) && incoming().userId == request.auth.uid && incoming().text is string && incoming().text.size() <= 1000;
+    }
+
+    match /users/{userId}/ratings/{movieId} {
+      allow read: if isSignedIn() && userId == request.auth.uid;
+      allow create, update: if isSignedIn() && userId == request.auth.uid && isValidId(movieId) && incoming().rating is number && incoming().rating >= 1 && incoming().rating <= 5;
+    }
+
+  }
+}
